@@ -6,23 +6,19 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(17,GPIO.OUT) #left
 GPIO.setup(18,GPIO.OUT) #right
 GPIO.setup(22,GPIO.OUT) #top
-
-
+GPIO.setup(23,GPIO.OUT) #bot
 
 #set pwm value
-freq1= 100
-dc1=0
-freq2= 100
-dc2=0
-freq3= 100
-dc3=0
+freq1 = freq2 = freq3 = freq4 = 100
+dc1 = dc2 = dc3 =dc4 = 0
 p=GPIO.PWM(17,freq1)
 pwm=GPIO.PWM(18,freq2)
 pto=GPIO.PWM(22,freq3)
-
+pbo=GPIO.PWM(23,freq4)
 p.start(dc1)
 pwm.start(dc2)
 pto.start(dc3)
+pbo.start(dc4)
 #set the initial logic output
 def right():
 	dc1=0
@@ -33,24 +29,27 @@ def left():
 	p.ChangeDutyCycle(dc1)
 	pwm.ChangeDutyCycle(dc2)
 def top():
+	dc4=0
 	pto.ChangeDutyCycle(dc3)
+	pbo.ChangeDutyCycle(dc4)
+def bot():
+	dc3=0
+	pto.ChangeDutyCycle(dc3)
+	pbo.ChangeDutyCycle(dc4)
 def forward():
 	p.ChangeDutyCycle(dc1)
 	pwm.ChangeDutyCycle(dc2)
 	
-buff1 = 0
-buff2 = 0
-buff3 = 0
-buff4 = 0
-buff5 = 0
+buff1 = buff2 = buff3 = buff4 = buff5 = buff6 = buff7 = 0
 keep_going = False
 keep = False
 keep_up = False
+keep_down = False
 keep_for = False
 try:
 	
 	while True:
-		print dc1,dc2, dc3
+		print dc1,dc2,dc3,dc4
 		command =raw_input("input:")
 		if command == 'a': #turn left
 			keep_going = True
@@ -58,33 +57,46 @@ try:
 			keep = True	
 		if command == 'w': #forward
 			keep_for = True
-		if command == 's': #top
+		if command == 'u': #top
 		    keep_up = True
-		if command == 'q':
+		if command == 'j': #down
+		    keep_down = True
+		if command == 'r': #stop two motor
 			dc1 = 0
 			dc2 = 0
 			buff1 = buff2 = buff3 = buff4 = 0
 			right()
 			left()
 			forward()
-		if command == 'e':
-			dc3 = 0
-			buff5 = 0
+		if command == 'i': #stop bottom motor
+			dc3 = dc4 = 0
+			buff5 = buff6 = buff7 = 0
 			top()
-		if command == 'y' and buff3 == 1:
+			bot()
+		if command == 'h' and buff7 == 1:
 			if buff5 ==1: #increase speed for goingup
 				dc3 = dc3 + 10 
 				if dc3 >= 90:
 					dc3 = 90
 				keep_up = True	
-		if command == 'u' and buff3 == 1:
+			if buff6 ==1: #increase speed for goingdown
+				dc4 = dc4 + 10 
+				if dc4 >= 90:
+					dc4 = 90
+				keep_down = True	
+		if command == 'k' and buff7 == 1:
 			if buff5 ==1: #decrease speed for goingup
 				dc3 = dc3 - 10 
 				if dc3 <= 5:
 					dc3 = 10
 				keep_up = True	
+			if buff6 ==1: #decrease speed for goingup
+				dc4 = dc4 - 10 
+				if dc4 <= 5:
+					dc4 = 10
+				keep_down = True	
 			 
-		if command == 'h' and buff3 == 1:
+		if command == 'q' and buff3 == 1:
 			if buff4 ==1:#increase speed for forward
 				dc2 = dc2 + 10 
 				if dc2 >= 90:
@@ -104,7 +116,7 @@ try:
 				if dc2 >= 90:
 					dc2 = 90
 				keep = True
-		if command == 'j' and buff3 == 1:
+		if command == 'e' and buff3 == 1:
 			if buff4 ==1:#decrease speed for forward
 				dc1 = dc1 - 10
 				if dc1 <= 5:
@@ -124,6 +136,11 @@ try:
 					dc2 = 10
 				keep = True					
 		if command == 'z':
+			p.stop()
+			pwm.stop()
+			pto.stop()
+			pbo.stop()	
+			GPIO.cleanup()
 			break
 	
 		while keep_going: #left
@@ -159,11 +176,21 @@ try:
 		while keep_up: #going up
 			if buff5 == 0:
 				dc3=50
-				buff3 = 1
+				buff7 = 1
 			print 'going up'
 			top()
 			buff5 = 1
+			buff6 = 0
 			keep_up = False
+		while keep_down: #going down
+			if buff6 == 0:
+				dc4=50
+				buff7 = 1
+			print 'going up'
+			bot()
+			buff6 = 1
+			buff5 = 0
+			keep_down = False
 		   
 		 
 		    
@@ -171,8 +198,9 @@ try:
 		    
 except KeyboardInterrupt:
 	print("Ctl C pressed")
+	p.stop()
+	pwm.stop()
+	pto.stop()
+	pbo.stop()	
+	GPIO.cleanup()
 
-p.stop()
-pwm.stop()
-pto.stop()	
-GPIO.cleanup()

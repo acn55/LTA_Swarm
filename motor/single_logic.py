@@ -7,7 +7,6 @@ GPIO.setup(17,GPIO.OUT) #AIN2
 GPIO.setup(18,GPIO.OUT) #AIN1
 
 
-
 #set the initial logic output
 def cw():
 	GPIO.output(17,GPIO.LOW)
