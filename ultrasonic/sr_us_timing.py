@@ -6,7 +6,7 @@ GPIO.setmode(GPIO.BCM)
 
 class sr_us:
 	
-	def __init__(self, trig_pin, echo_pin, timeout=1.):
+	def __init__(self, trig_pin, echo_pin, timeout=2.):
 		
 		GPIO.setup(trig_pin,GPIO.OUT) # Trig
 		GPIO.setup(echo_pin,GPIO.IN)  # Echo
@@ -36,7 +36,7 @@ class sr_us:
 			if (time.time() - echo_time) > self.timeout:
 				raise RuntimeError("US timed out high")
 		
-		# Calculate dist from time echo pin is high
+		# Calculate dist in cm from time echo pin is high
 		return (time.time() - echo_time) * 17000
 		
 try:
@@ -44,6 +44,7 @@ try:
 
 	for i in range(10):
 		print(us1.dist())
+		time.sleep(1)
 except RuntimeError as e:
 	print(e)
 except KeyboardInterrupt:
