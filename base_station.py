@@ -3,12 +3,15 @@ import pygame
 from pygame.locals import *
 import ctypes
 import socket
+import threading
+
+# Globals
+alt = 0
 
 class conn():
 
-    clientSocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-
     def __init__(self, ip, port):
+        self.clientSocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.clientSocket.connect((ip,port))
 
     def get_alt(self):
@@ -37,7 +40,7 @@ class UI:
         self.screen.blit(title_surf, title_rect)
 
         # Draw altitude
-        alt_surf= self.font.render(self.server.get_alt(), True, self.BLACK)
+        alt_surf= self.font.render(str(alt), True, self.BLACK)
         alt_rect = alt_surf.get_rect(center=(x, y+20))
         self.screen.blit(alt_surf, alt_rect)
 
@@ -45,7 +48,7 @@ class UI:
         self.screen.fill(self.WHITE)
         alt_surf= self.font.render(text, True, self.RED)
         alt_rect = alt_surf.get_rect(center=(self.width/2, self.width/2))
-        screen.blit(alt_surf, alt_rect)
+        self.screen.blit(alt_surf, alt_rect)
         pygame.display.flip()
 
     def update_screen(self):
@@ -53,7 +56,7 @@ class UI:
         self.__draw_alt()
         pygame.display.flip()
 
-    def __init__(self,server=None):
+    def __init__(self):
         pygame.init()
 
         # window title 
@@ -68,31 +71,37 @@ class UI:
         # Used to manage how fast the screen updates
         self.clock = pygame.time.Clock()
         self.frame_rate = 8
-        if not server is None:
-            self.server = server
-            self.update_screen()
        
 
+def conn_thread(ip,port):
+    global alt
+    server = conn('localhost',12002)
+    alt = server.get_alt()
+    server.close()
+
 if __name__ == '__main__':
+    
     try:
-        server = conn('10.148.11.245',12002)
+        x = threading.Thread(target=conn_thread, args=('localhost',12002))
+        x.start()
     except:
-        ui = UI(None)
+        ui = UI()
         ui.draw_error("Connection error")
         pygame.quit()
+        raise
     
-    ui = UI(server)
+    ui = UI()
 
     try:
         for i in range(10):
+            x = threading.Thread(target=conn_thread, args=('localhost',12002))
+            x.start()
             ui.update_screen()
             time.sleep(1)
     except:
         print("Error")
-        server.close()
         pygame.quit()
         raise
     
-    conn.close()
     pygame.quit()
 
