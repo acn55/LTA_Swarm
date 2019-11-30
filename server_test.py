@@ -14,6 +14,7 @@ running = True
 alt = 100
 coord = (13,45)
 orient = 0
+wp = [0,0,1,0]
 
 try:
     while running:
@@ -34,7 +35,22 @@ try:
         elif message == "quit":
             return_msg = "quitting"
             running = False
+        elif message == "forward":
+            pass
+        elif message == "backward":
+            pass
+        elif message == "right":
+            pass
+        elif message == "left":
+            pass
+        elif message == "up":
+            pass
+        elif message == "down":
+            pass
+        elif message.split(' ')[0] == "wp":
+            wp[:] = [int(i) for i in message.split(' ')[1].split(',')]
         else:
+            print("Not recognized")
             return_msg = "Not recognized"
         connectionSocket.send(return_msg.encode())
         connectionSocket.close()
