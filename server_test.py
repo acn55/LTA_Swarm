@@ -14,7 +14,8 @@ running = True
 alt = 100
 coord = (13,45)
 orient = 0
-wp = [0,0,1,0]
+wp = [0,0,1,0] # Current waypoint
+op_mode = 0 # 0: full auto, 1: waypoint, 2: manual
 
 try:
     while running:
@@ -33,21 +34,38 @@ try:
             return_msg = str(orient)
             orient = (orient + 10) % 360
         elif message == "quit":
+            # Close server (debugging)
             return_msg = "quitting"
             running = False
         elif message == "forward":
+            # Manual command move forward
             pass
         elif message == "backward":
+            # Manual command move backward
             pass
         elif message == "right":
+            # Manual command pivot right
             pass
         elif message == "left":
+            # Manual command pivot left
             pass
         elif message == "up":
+            # Manual command increase altitude
             pass
         elif message == "down":
+            # Manual command decrease altitude
             pass
+        elif message == "stop":
+            # Manual command stop motors
+            pass
+        elif message == "curr wp":
+            # Requesting current waypoint
+            return_msg = str(wp[0]) + "," + str(wp[1]) + "," + str(wp[2]) + "," + str(wp[3])
+        elif message.split(' ')[0] == "mode":
+            op_mode = int(message.split(' ')[1])
+            print("new op mode: " + str(op_mode))
         elif message.split(' ')[0] == "wp":
+            # Waypoint command set new waypoint
             wp[:] = [int(i) for i in message.split(' ')[1].split(',')]
         else:
             print("Not recognized")

@@ -48,6 +48,10 @@ class conn():
     def send_wp(self, x, y, z, theta):
         str = "wp " + x + "," + y + "," + z + "," + theta
         self.clientSocket.send(str.encode())
+        
+    def send_drive(self,mode):
+        str = "mode " + mode
+        self.clientSocket.send(str.encode())
     
     def exit(self):
         self.clientSocket.send("quit".encode())
@@ -57,10 +61,14 @@ class conn():
         self.clientSocket.close()
 
 class UI:
-
-    # Define some colors
+    
+    # Screen size
+    size = width, height = (500, 500)
+    
+    # Colors
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
+    BLUE = (0, 0, 255)
     GREEN = (0, 255, 0)
     RED = (255, 0, 0)
     TXT_COLOR_INACTIVE = pygame.Color('lightskyblue3')
@@ -99,19 +107,43 @@ class UI:
     
     # Waypoint control UL x input textbox
     wp_x_x = mode_x
-    wp_x_y = mode_y + 70
+    wp_x_y = mode_y + 110
     
     # Waypoint control UL y input textbox
-    wp_y_x = mode_x + wp_tb_size[0] + 10
-    wp_y_y = mode_y + 70
+    wp_y_x = wp_x_x + wp_tb_size[0] + 10
+    wp_y_y = wp_x_y
     
     # Waypoint control UL z input textbox
-    wp_z_x = mode_x + 2*(wp_tb_size[0] + 10)
-    wp_z_y = mode_y + 70
+    wp_z_x = wp_y_x + wp_tb_size[0] + 10
+    wp_z_y = wp_x_y
     
     # Waypoint control UL theta input textbox
-    wp_theta_x = mode_x + 3*(wp_tb_size[0] + 10)
-    wp_theta_y = mode_y + 70
+    wp_theta_x = wp_z_x + wp_tb_size[0] + 10
+    wp_theta_y = wp_x_y
+    
+    # Waypoint control UL send button
+    wp_send_x = wp_theta_x + wp_tb_size[0] + 10
+    wp_send_y = wp_x_y
+    
+    # Current waypoint x center
+    curr_wp_x_x = wp_x_x + wp_tb_size[0]/2
+    curr_wp_x_y = wp_x_y + 90
+    
+    # Current waypoint y center
+    curr_wp_y_x = curr_wp_x_x + wp_tb_size[0] + 10
+    curr_wp_y_y = curr_wp_x_y
+    
+    # Current waypoint z center
+    curr_wp_z_x = curr_wp_y_x + wp_tb_size[0] + 10
+    curr_wp_z_y = curr_wp_x_y
+    
+    # Current waypoint theta center
+    curr_wp_theta_x = curr_wp_z_x + wp_tb_size[0] + 10
+    curr_wp_theta_y = curr_wp_x_y
+    
+    # Center running error text
+    err_x = width/2
+    err_y = height - 10
     
     # Arrow key images
     up_arrow = pygame.image.load("up_arrow.png")
@@ -228,45 +260,101 @@ class UI:
             z_color = self.TXT_COLOR_INACTIVE
             theta_color = self.TXT_COLOR_INACTIVE
         
+        # Draw title
+        title_surf = self.font.render("Waypoint to Send", True, self.BLUE)
+        title_rect = title_surf.get_rect(center=((self.wp_y_x + self.wp_z_x + self.wp_tb_size[0])/2,self.wp_x_y-40))
+        self.screen.blit(title_surf, title_rect)
+        
+        # Draw x textbox
         x_surf = pygame.Surface(self.wp_tb_size)
         x_surf.fill(x_color)
         x_txt_surf = self.font.render(self.wp_x_txt, True, self.BLACK)
         x_rect = pygame.Rect((self.wp_x_x,self.wp_x_y), self.wp_tb_size)
         x_label_surf = self.font.render("x", True, self.BLACK)
-        x_label_rect = x_label_surf.get_rect(center=(self.wp_x_x + self.wp_tb_size[0]/2, self.wp_x_y - 15))
+        x_label_rect = x_label_surf.get_rect(center=(self.wp_x_x + self.wp_tb_size[0]/2, self.wp_x_y - 20))
+        self.screen.blit(x_surf,x_rect)
+        self.screen.blit(x_txt_surf,x_rect)
+        self.screen.blit(x_label_surf,x_label_rect)
+        
+        # Draw y textbox
         y_surf = pygame.Surface(self.wp_tb_size)
         y_surf.fill(y_color)
         y_txt_surf = self.font.render(self.wp_y_txt, True, self.BLACK)
         y_rect = pygame.Rect((self.wp_y_x,self.wp_y_y), self.wp_tb_size)
         y_label_surf = self.font.render("y", True, self.BLACK)
-        y_label_rect = y_label_surf.get_rect(center=(self.wp_y_x + self.wp_tb_size[0]/2, self.wp_y_y - 15))
+        y_label_rect = y_label_surf.get_rect(center=(self.wp_y_x + self.wp_tb_size[0]/2, self.wp_y_y - 20))
+        self.screen.blit(y_surf,y_rect)
+        self.screen.blit(y_txt_surf,y_rect)
+        self.screen.blit(y_label_surf,y_label_rect)
+        
+        # Draw z textbox
         z_surf = pygame.Surface(self.wp_tb_size)
         z_surf.fill(z_color)
         z_txt_surf = self.font.render(self.wp_z_txt, True, self.BLACK)
         z_rect = pygame.Rect((self.wp_z_x,self.wp_z_y), self.wp_tb_size)
         z_label_surf = self.font.render("z", True, self.BLACK)
-        z_label_rect = z_label_surf.get_rect(center=(self.wp_z_x + self.wp_tb_size[0]/2, self.wp_z_y - 15))
+        z_label_rect = z_label_surf.get_rect(center=(self.wp_z_x + self.wp_tb_size[0]/2, self.wp_z_y - 20))
+        self.screen.blit(z_surf,z_rect)
+        self.screen.blit(z_txt_surf,z_rect)
+        self.screen.blit(z_label_surf,z_label_rect)
+        
+        # Draw theta textbox
         theta_surf = pygame.Surface(self.wp_tb_size)
         theta_surf.fill(theta_color)
         theta_txt_surf = self.font.render(self.wp_theta_txt, True, self.BLACK)
         theta_rect = pygame.Rect((self.wp_theta_x,self.wp_theta_y), self.wp_tb_size)
         theta_label_surf = self.font.render(u"\u03B8", True, self.BLACK)
-        theta_label_rect = theta_label_surf.get_rect(center=(self.wp_theta_x + self.wp_tb_size[0]/2, self.wp_theta_y - 15))
-        
-        self.screen.blit(x_surf,x_rect)
-        self.screen.blit(x_txt_surf,x_rect)
-        self.screen.blit(x_label_surf,x_label_rect)
-        self.screen.blit(y_surf,y_rect)
-        self.screen.blit(y_txt_surf,y_rect)
-        self.screen.blit(y_label_surf,y_label_rect)
-        self.screen.blit(z_surf,z_rect)
-        self.screen.blit(z_txt_surf,z_rect)
-        self.screen.blit(z_label_surf,z_label_rect)
+        theta_label_rect = theta_label_surf.get_rect(center=(self.wp_theta_x + self.wp_tb_size[0]/2, self.wp_theta_y - 20))
         self.screen.blit(theta_surf,theta_rect)
         self.screen.blit(theta_txt_surf,theta_rect)
         self.screen.blit(theta_label_surf,theta_label_rect)
         
+        # Draw send button
+        text_surf = self.font.render("Send", True, self.WHITE)
+        text_rect = text_surf.get_rect(center=(self.wp_send_x + self.wp_tb_size[0]/2,self.wp_send_y + self.wp_tb_size[1]/2))
+        button_surf = pygame.Surface(self.wp_tb_size)
+        button_surf.fill(self.GREEN)
+        self.screen.blit(button_surf,(self.wp_send_x,self.wp_send_y))
+        self.screen.blit(text_surf,text_rect)
         
+    def __draw_curr_wp(self):
+        
+        # Draw title
+        title_surf = self.font.render("Current Waypoint", True, self.BLUE)
+        title_rect = title_surf.get_rect(center=((self.curr_wp_y_x + self.curr_wp_z_x)/2,self.curr_wp_x_y-40))
+        self.screen.blit(title_surf, title_rect)
+        
+        # Draw x
+        title_surf = self.font.render("x", True, self.BLACK)
+        title_rect = title_surf.get_rect(center=(self.curr_wp_x_x,self.curr_wp_x_y-20))
+        self.screen.blit(title_surf, title_rect)
+        txt_surf= self.font.render(self.curr_wp_x, True, self.BLACK)
+        txt_rect = txt_surf.get_rect(center=(self.curr_wp_x_x,self.curr_wp_x_y))
+        self.screen.blit(txt_surf, txt_rect)
+        
+        # Draw y
+        title_surf = self.font.render("y", True, self.BLACK)
+        title_rect = title_surf.get_rect(center=(self.curr_wp_y_x,self.curr_wp_y_y-20))
+        self.screen.blit(title_surf, title_rect)
+        txt_surf= self.font.render(self.curr_wp_y, True, self.BLACK)
+        txt_rect = txt_surf.get_rect(center=(self.curr_wp_y_x,self.curr_wp_y_y))
+        self.screen.blit(txt_surf, txt_rect)
+        
+        # Draw z
+        title_surf = self.font.render("z", True, self.BLACK)
+        title_rect = title_surf.get_rect(center=(self.curr_wp_z_x,self.curr_wp_z_y-20))
+        self.screen.blit(title_surf, title_rect)
+        txt_surf= self.font.render(self.curr_wp_z, True, self.BLACK)
+        txt_rect = txt_surf.get_rect(center=(self.curr_wp_z_x,self.curr_wp_z_y))
+        self.screen.blit(txt_surf, txt_rect)
+        
+        # Draw theta
+        title_surf = self.font.render(u"\u03B8", True, self.BLACK)
+        title_rect = title_surf.get_rect(center=(self.curr_wp_theta_x,self.curr_wp_theta_y-20))
+        self.screen.blit(title_surf, title_rect)
+        txt_surf= self.font.render(self.curr_wp_theta, True, self.BLACK)
+        txt_rect = txt_surf.get_rect(center=(self.curr_wp_theta_x,self.curr_wp_theta_y))
+        self.screen.blit(txt_surf, txt_rect)
 
     def draw_error(self,text):
         self.screen.fill(self.WHITE)
@@ -274,6 +362,16 @@ class UI:
         alt_rect = alt_surf.get_rect(center=(self.width/2, self.width/2))
         self.screen.blit(alt_surf, alt_rect)
         pygame.display.flip()
+        
+    def __draw_error_running(self):
+        if self.print_err:
+            if time.time() - self.err_time >= 3:
+                # Stop printing error after 3 sec
+                self.__print_err = False
+            else:
+                text_surf = self.font.render(self.err_txt, True, self.RED)
+                text_rect = text_surf.get_rect(center=(self.err_x,self.err_y))
+                self.screen.blit(text_surf,text_rect)
         
     def wait_frame_rate(self):
         self.clock.tick(self.frame_rate)
@@ -283,9 +381,16 @@ class UI:
         self.__draw_loc()
         self.__draw_quit()
         self.__draw_drive_sel()
+        self.__draw_error_running()
+        if self.drive == 0:
+            # Full auto mode
+            self.__draw_curr_wp()
         if self.drive == 1:
+            # Waypoint mode
             self.__draw_wp_ctrl()
+            self.__draw_curr_wp()
         elif self.drive == 2:
+            # Manual mode
             self.__draw_man_ctrl()
         pygame.display.flip()
 
@@ -297,8 +402,6 @@ class UI:
         self.font = pygame.font.Font(None, 20)
 
         # Set the width and height of the screen [width, height]
-        user32 = ctypes.windll.user32
-        self.size = self.width, self.height = (user32.GetSystemMetrics(0)*6/10, user32.GetSystemMetrics(1)*6/10)
         self.screen = pygame.display.set_mode(self.size)
         
         # Drive type
@@ -314,11 +417,21 @@ class UI:
         self.wp_z_txt = ""
         self.wp_theta_active = False
         self.wp_theta_txt = ""
+        
+        # Current waypoint
+        self.curr_wp_x = '0'
+        self.curr_wp_y = '0'
+        self.curr_wp_z = '1'
+        self.curr_wp_theta = '0'
 
         # Used to manage how fast the screen updates
         self.clock = pygame.time.Clock()
         self.frame_rate = 30
-       
+        
+        # Error to be printed
+        self.print_err = False
+        self.err_txt = ''
+        self.err_time = time.time()
 
 def get_pos_thread(ip,port):
     global coords, alt, orient
@@ -337,8 +450,20 @@ def man_control_thread(ip,port,dir):
     server = conn(ip,port)
     server.send_acc(dir)
     server.close()
+
+def str_is_num(str):
+    try:
+        float(str)
+        return True
+    except ValueError:
+        return False
     
-def wp_control_thread(ip,port,x,y,z,theta):
+def wp_control_thread(ip,port,ui):
+    
+    # Get coordinate strings
+    x,y,z,theta = ui.wp_x_txt,ui.wp_y_txt,ui.wp_z_txt,ui.wp_theta_txt
+    
+    # Fill in default values for blank coordinates
     if x == '':
         x = '0'
     if y == '':
@@ -347,17 +472,57 @@ def wp_control_thread(ip,port,x,y,z,theta):
         z = '1'
     if theta == '':
         theta = '0'
+        
+    # Clear textbox selections
+    ui.wp_x_active = False
+    ui.wp_y_active = False
+    ui.wp_z_active = False
+    ui.wp_theta_active = False
+    
+    # Check that all entries are floats before sending
+    if str_is_num(x):
+        if str_is_num(y):
+            if str_is_num(z):
+                if str_is_num(theta):
+                    print("Sending wp")
+                    server = conn(ip,port)
+                    server.send_wp(x, y, z, theta)
+                    server.close()
+                else:
+                    ui.print_err = True
+                    ui.err_txt = u"\u03B8" + " value is not a number"
+                    ui.err_time = time.time()
+                    ui.wp_theta_active = True
+            else:
+                ui.print_err = True
+                ui.err_txt = "z value is not a number"
+                ui.err_time = time.time()
+                ui.wp_z_active = True
+        else:
+            ui.print_err = True
+            ui.err_txt = "y value is not a number"
+            ui.err_time = time.time()
+            ui.wp_y_active = True
+    else:
+        ui.print_err = True
+        ui.err_txt = "x value is not a number"
+        ui.err_time = time.time()
+        ui.wp_x_active = True
+        
+def get_wp_thread(ip,port,ui):
     server = conn(ip,port)
-    server.send_wp(x, y, z, theta)
-    server.close()    
+    ui.curr_wp_x, ui.curr_wp_y, ui.curr_wp_z, ui.curr_wp_theta = server.get_wp().split(',')
+    server.close()
+        
+def send_drive_thread(ip,port,mode):
+    server = conn(ip,port)
+    server.send_drive(str(mode))
+    server.close()
     
 def terminate_server(ip,port):
     server = conn(ip,port)
     server.exit()
     server.close()
-
-def event_handler():
-    global running
     
 
 if __name__ == '__main__':
@@ -382,20 +547,29 @@ if __name__ == '__main__':
     try:
         while running:
             
+            # Only query drone for position and current waypoint every 30 frames
             if server_counter == 30:
                 server_thread = threading.Thread(target=get_pos_thread, args=(server_ip,server_port))
                 server_thread.start()
                 server_counter = 0
+            elif ui.drive == 0 and server_counter == 15:
+                # Waypoint only changes in auto mode
+                wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
+                wp_thread.start()
                 
             server_counter += 1
             
+            # Handle PyGame events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    # X button
                     running = False
                     break
                 elif(event.type is MOUSEBUTTONDOWN):
+                    # Mouse click
                     x,y = pygame.mouse.get_pos()
                     
+                    # If in waypoint mode and click somewhere else, clear textbox selection
                     if ui.drive == 1:
                         ui.wp_x_active = False
                         ui.wp_y_active = False
@@ -410,14 +584,27 @@ if __name__ == '__main__':
                         # Auto button clicked
                         print("Auto")
                         ui.drive = 0
+                        wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
+                        wp_thread.start()
+                        time.sleep(0.02)
+                        drive_thread = threading.Thread(target=send_drive_thread, args=(server_ip,server_port,ui.drive))
+                        drive_thread.start()    
                     elif x < ui.mode_x + 180 and x > ui.mode_x + 100 and y < ui.mode_y + 40 and y > ui.mode_y:
                         # Waypoint button clicked
                         print("Waypoint")
                         ui.drive = 1
+                        wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
+                        wp_thread.start()
+                        time.sleep(0.02)
+                        drive_thread = threading.Thread(target=send_drive_thread, args=(server_ip,server_port,ui.drive))
+                        drive_thread.start()                     
                     elif x < ui.mode_x + 280 and x > ui.mode_x + 200 and y < ui.mode_y + 40 and y > ui.mode_y:
                         # Manual button clicked
                         print("Manual")
                         ui.drive = 2
+                        time.sleep(0.02)
+                        drive_thread = threading.Thread(target=send_drive_thread, args=(server_ip,server_port,ui.drive))
+                        drive_thread.start()    
                     elif ui.drive == 1:
                         # Waypoint drive mode
                         if x > ui.wp_x_x and x < ui.wp_x_x + ui.wp_tb_size[0] and y > ui.wp_x_y and y < ui.wp_x_y + ui.wp_tb_size[1]:
@@ -436,6 +623,13 @@ if __name__ == '__main__':
                             # Waypoint theta input clicked
                             print("WP theta clicked")
                             ui.wp_theta_active = True
+                        elif x > ui.wp_send_x and x < ui.wp_send_x + ui.wp_tb_size[0] and y > ui.wp_send_y and y < ui.wp_send_y + ui.wp_tb_size[1]:
+                            # Send waypoint clicked
+                            move_thread = threading.Thread(target=wp_control_thread, args=(server_ip,server_port,ui))
+                            move_thread.start()
+                            time.sleep(0.02)
+                            wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
+                            wp_thread.start()                            
                     elif ui.drive == 2:
                         # Manual drive mode
                         if x > ui.pos_x and x < ui.pos_x + 70 and y > ui.pos_y and y < ui.pos_y + 70:
@@ -478,28 +672,41 @@ if __name__ == '__main__':
                     move_thread.start()
                 elif(event.type is KEYDOWN) and ui.drive == 1:
                     if event.key == pygame.K_RETURN:
-                        print("Sending wp")
-                        move_thread = threading.Thread(target=wp_control_thread, \
-                            args=(server_ip,server_port,ui.wp_x_txt,ui.wp_y_txt,ui.wp_z_txt,ui.wp_theta_txt))
+                        move_thread = threading.Thread(target=wp_control_thread, args=(server_ip,server_port,ui))
                         move_thread.start()
+                        time.sleep(0.02)
+                        wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
+                        wp_thread.start()
                     elif ui.wp_x_active:
                         if event.key == pygame.K_BACKSPACE:
                             ui.wp_x_txt = ui.wp_x_txt[:-1]
+                        elif event.key == pygame.K_TAB:
+                            ui.wp_x_active = False
+                            ui.wp_y_active = True
                         else:
                             ui.wp_x_txt += event.unicode
                     elif ui.wp_y_active:
                         if event.key == pygame.K_BACKSPACE:
                             ui.wp_y_txt = ui.wp_y_txt[:-1]
+                        elif event.key == pygame.K_TAB:
+                            ui.wp_y_active = False
+                            ui.wp_z_active = True
                         else:
                             ui.wp_y_txt += event.unicode
                     elif ui.wp_z_active:
                         if event.key == pygame.K_BACKSPACE:
                             ui.wp_z_txt = ui.wp_z_txt[:-1]
+                        elif event.key == pygame.K_TAB:
+                            ui.wp_z_active = False
+                            ui.wp_theta_active = True
                         else:
                             ui.wp_z_txt += event.unicode
                     elif ui.wp_theta_active:
                         if event.key == pygame.K_BACKSPACE:
                             ui.wp_theta_txt = ui.wp_theta_txt[:-1]
+                        elif event.key == pygame.K_TAB:
+                            ui.wp_theta_active = False
+                            ui.wp_x_active = True
                         else:
                             ui.wp_theta_txt += event.unicode
                 else:
