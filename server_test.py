@@ -6,16 +6,17 @@ import time
 serverPort = 12002
 
 serverSocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-serverSocket.bind(('',serverPort))
+serverSocket.bind(('127.0.0.1',serverPort))
 serverSocket.listen(1)
 print("The server is ready to receive")
 
 running = True
-alt = 100
-coord = (13,45)
+alt = 0
+coord = (0,0)
 orient = 0
 wp = [0,0,1,0] # Current waypoint
 op_mode = 0 # 0: full auto, 1: waypoint, 2: manual
+ATs = [[1,2.3,0.5],[5,1.1,-0.2]]
 
 try:
     while running:
@@ -25,14 +26,11 @@ try:
         if message == "alt":
             # Requesting altitude
             return_msg = str(alt)
-            alt += 1
         elif message == "coord":
             # Requesting x,y coordinates
             return_msg = str(coord)
-            coord = (coord[0] + 1, coord[1])
         elif message == "orient":
             return_msg = str(orient)
-            orient = (orient + 10) % 360
         elif message == "quit":
             # Close server (debugging)
             return_msg = "quitting"
@@ -67,6 +65,13 @@ try:
         elif message.split(' ')[0] == "wp":
             # Waypoint command set new waypoint
             wp[:] = [int(i) for i in message.split(' ')[1].split(',')]
+        elif message == "ats":
+            # Requesting AprilTag data
+            numATs = len(ATs)
+            return_msg = str(numATs)
+            for a in ATs:
+                for i in a:
+                    return_msg += "," + str(i)
         else:
             print("Not recognized")
             return_msg = "Not recognized"

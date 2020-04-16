@@ -9,7 +9,15 @@ import threading
 alt = 0
 coords = "(0, 0)"
 orient = 0
+ATs = []
 running = True
+
+class AT():
+    
+    def __init__(self, num, dist, ang):
+        self.num = num
+        self.dist = dist
+        self.angle = ang
 
 class conn():
     
@@ -30,6 +38,11 @@ class conn():
         
     def get_orient(self):
         self.clientSocket.send("orient".encode())
+        msg, addr = self.clientSocket.recvfrom(1024)
+        return msg.decode()
+        
+    def get_ATs(self):
+        self.clientSocket.send("ats".encode())
         msg, addr = self.clientSocket.recvfrom(1024)
         return msg.decode()
         
@@ -71,6 +84,9 @@ class UI:
     BLUE = (0, 0, 255)
     GREEN = (0, 255, 0)
     RED = (255, 0, 0)
+    LIST_TITLE_COLOR = (16, 89, 20)
+    LIST_HEADER_COLOR = (28, 128, 33)
+    LIST_ENTRY_COLOR = (194, 237, 197)
     TXT_COLOR_INACTIVE = pygame.Color('lightskyblue3')
     TXT_COLOR_ACTIVE = pygame.Color('dodgerblue2')
         
@@ -78,10 +94,6 @@ class UI:
     # quit button
     quit_x = 400
     quit_y = 10
-    
-    # camera feed
-    cam_x = 20
-    cam_y = 20
     
     # Localization information
     loc_x = 370
@@ -91,6 +103,21 @@ class UI:
     # UL of leftmost button
     mode_x = 20
     mode_y = 200
+    
+    # Navigation mode button size and spacing
+    mode_but_size = (80,40)
+    mode_but_space = mode_but_size[0] + 20
+    
+    # AprilTag list
+    # UL of table
+    ATList_x = 20
+    ATList_y = 20
+    
+    # AprilTag list row size
+    ATList_size = (3*mode_but_space - 20,20)
+    
+    # AprilTag list number of rows
+    ATList_rows = 5
     
     # Manual control position buttons
     # UL of up arrow key
@@ -184,16 +211,71 @@ class UI:
         self.screen.blit(button_surf,(self.quit_x,self.quit_y))
         self.screen.blit(text_surf,text_rect)
         
+    def __draw_ATList(self):
+        
+        # Title background
+        back_surf = pygame.Surface(self.ATList_size)
+        back_rect = (self.ATList_x, self.ATList_y)
+        back_surf.fill(self.LIST_TITLE_COLOR)
+        self.screen.blit(back_surf, back_rect)
+        
+        # Title text
+        txt_surf = self.font.render("Visible AprilTags", True, self.WHITE)
+        txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/2, self.ATList_y + self.ATList_size[1]/2))
+        self.screen.blit(txt_surf, txt_rect)
+        
+        # Column headers background
+        back_surf = pygame.Surface(self.ATList_size)
+        back_rect = (self.ATList_x, self.ATList_y + self.ATList_size[1])
+        back_surf.fill(self.LIST_HEADER_COLOR)
+        self.screen.blit(back_surf, back_rect)
+        
+        # Header text
+        txt_surf = self.font.render("Number", True, self.WHITE)
+        txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/6, self.ATList_y + 1.5*self.ATList_size[1]))
+        self.screen.blit(txt_surf, txt_rect)
+        txt_surf = self.font.render("Distance", True, self.WHITE)
+        txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/2, self.ATList_y + 1.5*self.ATList_size[1]))
+        self.screen.blit(txt_surf, txt_rect)
+        txt_surf = self.font.render("Orientation", True, self.WHITE)
+        txt_rect = txt_surf.get_rect(center=(self.ATList_x + (5./6.)*self.ATList_size[0], self.ATList_y + 1.5*self.ATList_size[1]))
+        self.screen.blit(txt_surf, txt_rect)
+        
+        # Blank rows
+        for r in range(2,self.ATList_rows+2):
+            back_surf = pygame.Surface(self.ATList_size)
+            back_rect = (self.ATList_x, self.ATList_y + r*self.ATList_size[1])
+            back_surf.fill(self.LIST_ENTRY_COLOR)
+            self.screen.blit(back_surf, back_rect)
+        
+        # Table lines
+        for c in range(1,3):
+            pygame.draw.line(self.screen, self.BLACK, (self.ATList_x+(c/3.)*self.ATList_size[0],self.ATList_y+self.ATList_size[1]), (self.ATList_x+(c/3.)*self.ATList_size[0],self.ATList_y+(self.ATList_rows+2)*self.ATList_size[1]-1))
+        for r in range(1,self.ATList_rows+2):
+            pygame.draw.line(self.screen, self.BLACK, (self.ATList_x,self.ATList_y+r*self.ATList_size[1]), (self.ATList_x+self.ATList_size[0]-1,self.ATList_y+r*self.ATList_size[1]))
+        
+        global ATs
+        
+        # AprilTag info text
+        for a in range(len(ATs)):
+            txt_surf = self.font.render(str(ATs[a].num), True, self.BLACK)
+            txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/6, self.ATList_y + (2.5+a)*self.ATList_size[1]))
+            self.screen.blit(txt_surf, txt_rect)
+            txt_surf = self.font.render(str(ATs[a].dist), True, self.BLACK)
+            txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/2, self.ATList_y + (2.5+a)*self.ATList_size[1]))
+            self.screen.blit(txt_surf, txt_rect)
+            txt_surf = self.font.render(str(ATs[a].angle), True, self.BLACK)
+            txt_rect = txt_surf.get_rect(center=(self.ATList_x + (5./6.)*self.ATList_size[0], self.ATList_y + (2.5+a)*self.ATList_size[1]))
+            self.screen.blit(txt_surf, txt_rect)
+        
     def __draw_drive_sel(self):
-        but_size = (80,40)
-        txt_x = self.mode_x + but_size[0]/2
-        txt_y = self.mode_y + but_size[1]/2
-        but_space = but_size[0] + 20
+        txt_x = self.mode_x + self.mode_but_size[0]/2
+        txt_y = self.mode_y + self.mode_but_size[1]/2
         for i in range(3):
    
             # Background
-            back_surf = pygame.Surface(but_size)
-            back_rect = (self.mode_x + i*but_space, self.mode_y)
+            back_surf = pygame.Surface(self.mode_but_size)
+            back_rect = (self.mode_x + i*self.mode_but_space, self.mode_y)
             if i == self.drive:
                 # Currently in this mode
                 back_surf.fill(self.GREEN)
@@ -210,7 +292,7 @@ class UI:
             elif i == 2:
                 txt = "Manual"
             txt_surf = self.font.render(txt, True, self.WHITE)
-            txt_rect = txt_surf.get_rect(center=(txt_x + i*but_space,txt_y))
+            txt_rect = txt_surf.get_rect(center=(txt_x + i*self.mode_but_space,txt_y))
             self.screen.blit(txt_surf, txt_rect)
             
     def __draw_man_ctrl(self):
@@ -381,11 +463,12 @@ class UI:
         self.__draw_loc()
         self.__draw_quit()
         self.__draw_drive_sel()
+        self.__draw_ATList()
         self.__draw_error_running()
         if self.drive == 0:
             # Full auto mode
             self.__draw_curr_wp()
-        if self.drive == 1:
+        elif self.drive == 1:
             # Waypoint mode
             self.__draw_wp_ctrl()
             self.__draw_curr_wp()
@@ -445,6 +528,16 @@ def get_pos_thread(ip,port):
         elif d == "orient":
             orient = server.get_orient()
         server.close()
+        
+def get_ats_thread(ip,port):
+    server = conn(ip,port)
+    global ATs
+    ATs = []
+    new_ATs = server.get_ATs().split(',')
+    num_ATs = int(new_ATs[0])
+    for a in range(num_ATs):
+        ATs.append(AT(int(new_ATs[3*a+1]),float(new_ATs[3*a+2]),float(new_ATs[3*a+3])))
+    server.close()
         
 def man_control_thread(ip,port,dir):
     server = conn(ip,port)
@@ -527,7 +620,8 @@ def terminate_server(ip,port):
 
 if __name__ == '__main__':
     
-    server_ip = 'localhost'
+    server_ip = '127.0.0.1'
+
     server_port = 12002
     
     
@@ -547,15 +641,18 @@ if __name__ == '__main__':
     try:
         while running:
             
-            # Only query drone for position and current waypoint every 30 frames
+            # Only query drone for position, current waypoint, and AprilTags every 30 frames
             if server_counter == 30:
                 server_thread = threading.Thread(target=get_pos_thread, args=(server_ip,server_port))
                 server_thread.start()
                 server_counter = 0
-            elif ui.drive == 0 and server_counter == 15:
+            elif ui.drive == 0 and server_counter == 20:
                 # Waypoint only changes in auto mode
                 wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
                 wp_thread.start()
+            elif server_counter == 10:
+                at_thread = threading.Thread(target=get_ats_thread, args=(server_ip,server_port))
+                at_thread.start()
                 
             server_counter += 1
             
