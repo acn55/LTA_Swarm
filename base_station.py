@@ -4,45 +4,43 @@ from pygame.locals import *
 import ctypes
 import socket
 import threading
+from numpy import arange
 
-# Globals
-alt = 0
-coords = "(0, 0)"
-orient = 0
-ATs = []
+### Globals ###
+
+# Localization
+AT_ID = None        # Visible AprilTag ID or None if no AT visible or ATs disabled
+alt = None          # Last known altitude or None if ATs disabled or not yet found
+coords = None       # Last known position (x,y) or None if ATs disabled or not yet found
+orient = None       # Last known orientation in deg or None if ATs disabled or not yet found
+
+# Time of flight distances
+# Left, center, right
+TOF_dist = [0.,0.,0.]
+
+# Time of flight status
+# Left, center, right
+# 0: OK
+# 1: Danger
+# 2: Collision imminent
+TOF_status = [0, 0, 0]
+
+# While loop variable
 running = True
 
-class AT():
-    
-    def __init__(self, num, dist, ang):
-        self.num = num
-        self.dist = dist
-        self.angle = ang
-
-class conn():
+class conn:
     
     def __init__(self, ip, port):
         self.clientSocket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.clientSocket.connect((ip,port))
-    
-    def get_coord(self):
-        self.clientSocket.send("coord".encode())
-        msg, addr = self.clientSocket.recvfrom(1024)
-        #return tuple(map(int,msg.decode().split(',')))
-        return msg.decode()
-    
-    def get_alt(self):
-        self.clientSocket.send("alt".encode())
+        
+    def get_AT(self):
+        self.clientSocket.send("at".encode())
         msg, addr = self.clientSocket.recvfrom(1024)
         return msg.decode()
         
-    def get_orient(self):
-        self.clientSocket.send("orient".encode())
-        msg, addr = self.clientSocket.recvfrom(1024)
-        return msg.decode()
-        
-    def get_ATs(self):
-        self.clientSocket.send("ats".encode())
+    def get_TOF(self):
+        self.clientSocket.send("tof".encode())
         msg, addr = self.clientSocket.recvfrom(1024)
         return msg.decode()
         
@@ -81,48 +79,101 @@ class UI:
     # Colors
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
-    BLUE = (0, 0, 255)
-    GREEN = (0, 255, 0)
-    RED = (255, 0, 0)
+    GRAY_BACK = (218, 210, 216)
+    GRAY_DARK = (70, 70, 85)
+    GRAYED_OUT = (170, 175, 180)
+    BLUE_DARK = (16, 37, 66)
+    BLUE_MED = (25, 100, 126)
+    BLUE_LIGHT = (15, 139, 141)
+    GREEN = (105, 153, 93)
+    RED = (168, 32, 26)
+    YELLOW = (236, 154, 41)
     LIST_TITLE_COLOR = (16, 89, 20)
     LIST_HEADER_COLOR = (28, 128, 33)
     LIST_ENTRY_COLOR = (194, 237, 197)
-    TXT_COLOR_INACTIVE = pygame.Color('lightskyblue3')
+    TXT_COLOR_INACTIVE = WHITE
     TXT_COLOR_ACTIVE = pygame.Color('dodgerblue2')
         
-    # Object coordinates
-    # quit button
-    quit_x = 400
+    #### Object locations and sizes ####
+    
+    # General spacing
+    vert_space = 15
+    title_space = 10
+    horiz_space = 40
+    
+    # Quit button size
+    quit_size = (40,20)
+    
+    # Quit button
+    quit_x = width - quit_size[0] - 10
     quit_y = 10
     
-    # Localization information
-    loc_x = 370
-    loc_y = 80
-    
-    # Navigation mode buttons
-    # UL of leftmost button
-    mode_x = 20
-    mode_y = 200
+    # Header
+    header_x = 0.5*quit_x
+    header_y = 30
     
     # Navigation mode button size and spacing
     mode_but_size = (80,40)
     mode_but_space = mode_but_size[0] + 20
     
-    # AprilTag list
+    # AprilTag localization table
     # UL of table
-    ATList_x = 20
-    ATList_y = 20
+    AT_table_x = 10
+    AT_table_y = header_y + 20 + vert_space
     
-    # AprilTag list row size
-    ATList_size = (3*mode_but_space - 20,20)
+    # AprilTag localization table row size
+    AT_table_size = (3*mode_but_space - 20,20)
     
-    # AprilTag list number of rows
-    ATList_rows = 5
+    # AprilTag localization table number of rows & columns
+    AT_table_rows = 3
+    AT_table_cols = 4
+    
+    # Localization information
+    # Center of "Location" title text
+    loc_x = AT_table_x + AT_table_size[0] + horiz_space
+    loc_y = AT_table_y + title_space
+    
+    # Time of flight (TOF) distances table
+    # UL of table
+    TOF_table_x = AT_table_x
+    TOF_table_y = AT_table_y + AT_table_rows*AT_table_size[1] + vert_space + title_space
+    
+    # TOF table row size
+    TOF_table_size = AT_table_size
+    
+    # TOF table rows and columns
+    global TOF_dist
+    TOF_table_rows = 3
+    TOF_table_cols = len(TOF_dist)
+    
+    # Enable switch size
+    switch_size = (30,60)
+    
+    # Enable AprilTag switch UL
+    # AT_switch_x = AT_table_x + AT_table_size[0]/(num_switches + 1) - 0.5*switch_size[0]
+    # AT_switch_y = AT_table_y + (AT_table_rows)*AT_table_size[1] + vert_space + title_space
+    AT_switch_x = AT_table_x + AT_table_size[0] + horiz_space
+    AT_switch_y = AT_table_y + 0.5*AT_table_rows*AT_table_size[1] - 0.5*switch_size[1]
+    
+    # Enable TOF switch UL
+    TOF_switch_x = TOF_table_x + TOF_table_size[0] + horiz_space
+    TOF_switch_y = TOF_table_y + 0.5*TOF_table_rows*TOF_table_size[1] - 0.5*switch_size[1]
+    
+    # Enable projector switch UL
+    # proj_switch_x = AT_switch_x + AT_table_size[0]/(num_switches + 1)
+    # proj_switch_y = AT_switch_y
+    proj_switch_x = AT_switch_x + switch_size[0] + horiz_space
+    proj_switch_y = AT_switch_y + 0.5*(TOF_switch_y + switch_size[1] - AT_switch_y) - 0.5*switch_size[1]
+    
+    # Navigation mode buttons
+    # UL of leftmost button
+    mode_x = TOF_table_x
+    mode_y = TOF_table_y + TOF_table_rows*TOF_table_size[1] + vert_space
     
     # Manual control position buttons
     # UL of up arrow key
     pos_x = mode_x + 105
-    pos_y = mode_y + 70
+    pos_y = mode_y + mode_but_size[1] + vert_space + title_space
     
     # Manual control altitude buttons
     # UL of up arrow key
@@ -132,9 +183,25 @@ class UI:
     # Waypoint control textbox size
     wp_tb_size = (50,20)
     
+    # Current waypoint x center
+    curr_wp_x_x = mode_x + 0.5*wp_tb_size[0]
+    curr_wp_x_y = mode_y + mode_but_size[1] + vert_space + title_space + 30
+    
+    # Current waypoint y center
+    curr_wp_y_x = curr_wp_x_x + wp_tb_size[0] + 10
+    curr_wp_y_y = curr_wp_x_y
+    
+    # Current waypoint z center
+    curr_wp_z_x = curr_wp_y_x + wp_tb_size[0] + 10
+    curr_wp_z_y = curr_wp_x_y
+    
+    # Current waypoint theta center
+    curr_wp_theta_x = curr_wp_z_x + wp_tb_size[0] + 10
+    curr_wp_theta_y = curr_wp_x_y
+    
     # Waypoint control UL x input textbox
-    wp_x_x = mode_x
-    wp_x_y = mode_y + 110
+    wp_x_x = curr_wp_x_x - 0.5*wp_tb_size[0]
+    wp_x_y = curr_wp_x_y + vert_space + title_space + 20
     
     # Waypoint control UL y input textbox
     wp_y_x = wp_x_x + wp_tb_size[0] + 10
@@ -152,22 +219,6 @@ class UI:
     wp_send_x = wp_theta_x + wp_tb_size[0] + 10
     wp_send_y = wp_x_y
     
-    # Current waypoint x center
-    curr_wp_x_x = wp_x_x + wp_tb_size[0]/2
-    curr_wp_x_y = wp_x_y + 90
-    
-    # Current waypoint y center
-    curr_wp_y_x = curr_wp_x_x + wp_tb_size[0] + 10
-    curr_wp_y_y = curr_wp_x_y
-    
-    # Current waypoint z center
-    curr_wp_z_x = curr_wp_y_x + wp_tb_size[0] + 10
-    curr_wp_z_y = curr_wp_x_y
-    
-    # Current waypoint theta center
-    curr_wp_theta_x = curr_wp_z_x + wp_tb_size[0] + 10
-    curr_wp_theta_y = curr_wp_x_y
-    
     # Center running error text
     err_x = width/2
     err_y = height - 10
@@ -177,6 +228,11 @@ class UI:
     down_arrow = pygame.image.load("down_arrow.png")
     right_arrow = pygame.image.load("right_arrow.png")
     left_arrow = pygame.image.load("left_arrow.png")
+
+    def __draw_header(self):
+        txt_surf = self.header_font.render("LTA Swarm Base Station", True, self.YELLOW)
+        txt_rect = txt_surf.get_rect(center=(self.header_x,self.header_y))
+        self.screen.blit(txt_surf, txt_rect)
 
     def __draw_loc(self):
         # Draw position
@@ -205,68 +261,135 @@ class UI:
         
     def __draw_quit(self):
         text_surf = self.font.render("QUIT", True, self.WHITE)
-        text_rect = text_surf.get_rect(center=(self.quit_x+20,self.quit_y+10))
-        button_surf = pygame.Surface((40, 20))
+        text_rect = text_surf.get_rect(center=(self.quit_x+0.5*self.quit_size[0],self.quit_y+0.5*self.quit_size[1]))
+        button_surf = pygame.Surface(self.quit_size)
         button_surf.fill(self.RED)
         self.screen.blit(button_surf,(self.quit_x,self.quit_y))
         self.screen.blit(text_surf,text_rect)
         
-    def __draw_ATList(self):
-        
+    def __draw_table(self,x,y,rows,cols,row_size,title,headers,data,data_en,TOF_table):
+    
+        # Row & column text coordinates
+        col_x = arange(x + 1./(2*cols)*row_size[0],x + row_size[0],1./cols*row_size[0])
+        row_y = arange(y + 0.5*row_size[1],y + (rows+0.5)*row_size[1],row_size[1])
+    
         # Title background
-        back_surf = pygame.Surface(self.ATList_size)
-        back_rect = (self.ATList_x, self.ATList_y)
-        back_surf.fill(self.LIST_TITLE_COLOR)
+        back_surf = pygame.Surface(row_size)
+        back_rect = (x, y)
+        back_surf.fill(self.BLUE_DARK)
         self.screen.blit(back_surf, back_rect)
         
         # Title text
-        txt_surf = self.font.render("Visible AprilTags", True, self.WHITE)
-        txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/2, self.ATList_y + self.ATList_size[1]/2))
+        txt_surf = self.font.render(title, True, self.WHITE)
+        txt_rect = txt_surf.get_rect(center=(x + 0.5*row_size[0], row_y[0]))
         self.screen.blit(txt_surf, txt_rect)
         
         # Column headers background
-        back_surf = pygame.Surface(self.ATList_size)
-        back_rect = (self.ATList_x, self.ATList_y + self.ATList_size[1])
-        back_surf.fill(self.LIST_HEADER_COLOR)
+        back_surf = pygame.Surface(row_size)
+        back_rect = (x, y + row_size[1])
+        back_surf.fill(self.BLUE_MED)
         self.screen.blit(back_surf, back_rect)
         
         # Header text
-        txt_surf = self.font.render("Number", True, self.WHITE)
-        txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/6, self.ATList_y + 1.5*self.ATList_size[1]))
-        self.screen.blit(txt_surf, txt_rect)
-        txt_surf = self.font.render("Distance", True, self.WHITE)
-        txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/2, self.ATList_y + 1.5*self.ATList_size[1]))
-        self.screen.blit(txt_surf, txt_rect)
-        txt_surf = self.font.render("Orientation", True, self.WHITE)
-        txt_rect = txt_surf.get_rect(center=(self.ATList_x + (5./6.)*self.ATList_size[0], self.ATList_y + 1.5*self.ATList_size[1]))
-        self.screen.blit(txt_surf, txt_rect)
+        for c in range(cols):
+            txt_surf = self.font.render(headers[c], True, self.WHITE)
+            txt_rect = txt_surf.get_rect(center=(col_x[c], row_y[1]))
+            self.screen.blit(txt_surf, txt_rect)
         
-        # Blank rows
-        for r in range(2,self.ATList_rows+2):
-            back_surf = pygame.Surface(self.ATList_size)
-            back_rect = (self.ATList_x, self.ATList_y + r*self.ATList_size[1])
-            back_surf.fill(self.LIST_ENTRY_COLOR)
+        # Data background
+        if TOF_table:
+            global TOF_status
+            for c in range(self.TOF_table_cols):
+                back_surf = pygame.Surface((row_size[0]/float(self.TOF_table_cols)+1, row_size[1]))
+                back_rect = (x + c*row_size[0]/float(self.TOF_table_cols), y + 2*row_size[1])
+                if data_en:
+                    if TOF_status[c] == 0:
+                        back_surf.fill(self.GREEN)
+                    elif TOF_status[c] == 1:
+                        back_surf.fill(self.YELLOW)
+                    else:
+                        back_surf.fill(self.RED)
+                else:
+                    back_surf.fill(self.GRAYED_OUT)
+                self.screen.blit(back_surf, back_rect)
+        else:
+            back_surf = pygame.Surface((row_size[0],(rows-2)*row_size[1]))
+            back_rect = (x, y + 2*row_size[1])
+            if data_en:
+                back_surf.fill(self.BLUE_LIGHT)
+            else:
+                back_surf.fill(self.GRAYED_OUT)
             self.screen.blit(back_surf, back_rect)
         
         # Table lines
-        for c in range(1,3):
-            pygame.draw.line(self.screen, self.BLACK, (self.ATList_x+(c/3.)*self.ATList_size[0],self.ATList_y+self.ATList_size[1]), (self.ATList_x+(c/3.)*self.ATList_size[0],self.ATList_y+(self.ATList_rows+2)*self.ATList_size[1]-1))
-        for r in range(1,self.ATList_rows+2):
-            pygame.draw.line(self.screen, self.BLACK, (self.ATList_x,self.ATList_y+r*self.ATList_size[1]), (self.ATList_x+self.ATList_size[0]-1,self.ATList_y+r*self.ATList_size[1]))
+        for c in range(1,cols):
+            pygame.draw.line(self.screen, self.BLACK, (x+(c/float(cols))*row_size[0], y+row_size[1]), (x+(c/float(cols))*row_size[0], y+rows*row_size[1]-1))
+        for r in range(1,rows):
+            pygame.draw.line(self.screen, self.BLACK, (x, y+r*row_size[1]), (x+row_size[0]-1, y+r*row_size[1]))
         
-        global ATs
+        # Data text
+        for c in range(cols):
+            if rows == 3:
+                if data[c] is not None:
+                    txt_surf = self.font.render(str(data[c]), True, self.BLACK)
+                    txt_rect = txt_surf.get_rect(center=(col_x[c], row_y[2]))
+                    self.screen.blit(txt_surf, txt_rect)
+            else:
+                for r in range(rows-2):
+                    if data[c][r] is not None:
+                        txt_surf = self.font.render(str(data[c][r]), True, self.BLACK)
+                        txt_rect = txt_surf.get_rect(center=(col_x[c], row_y[r+2]))
+                        self.screen.blit(txt_surf, txt_rect)
         
-        # AprilTag info text
-        for a in range(len(ATs)):
-            txt_surf = self.font.render(str(ATs[a].num), True, self.BLACK)
-            txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/6, self.ATList_y + (2.5+a)*self.ATList_size[1]))
-            self.screen.blit(txt_surf, txt_rect)
-            txt_surf = self.font.render(str(ATs[a].dist), True, self.BLACK)
-            txt_rect = txt_surf.get_rect(center=(self.ATList_x + self.ATList_size[0]/2, self.ATList_y + (2.5+a)*self.ATList_size[1]))
-            self.screen.blit(txt_surf, txt_rect)
-            txt_surf = self.font.render(str(ATs[a].angle), True, self.BLACK)
-            txt_rect = txt_surf.get_rect(center=(self.ATList_x + (5./6.)*self.ATList_size[0], self.ATList_y + (2.5+a)*self.ATList_size[1]))
-            self.screen.blit(txt_surf, txt_rect)
+    def __draw_AT_table(self):
+        
+        global AT_ID, coords, alt, orient
+        title = "AprilTag Robot Localization"
+        headers = ["Visible ID", "Position", "Altitude", "Orientation"]
+        data = [AT_ID, coords, alt, orient]
+        
+        self.__draw_table(self.AT_table_x, self.AT_table_y, self.AT_table_rows, self.AT_table_cols, self.AT_table_size, title, headers, data, self.AT_en, False)
+            
+    def __draw_TOF_table(self):
+    
+        global TOF_dist
+        title = "Time of Flight Distances"
+        headers = ["Left", "Forward", "Right"]
+        
+        self.__draw_table(self.TOF_table_x, self.TOF_table_y, self.TOF_table_rows, self.TOF_table_cols, self.TOF_table_size, title, headers, TOF_dist, self.TOF_en, True)
+        
+    def __draw_switch(self,x,y,on,title):
+        
+        # Title
+        title_surf = self.font.render(title, True, self.BLACK)
+        title_rect = title_surf.get_rect(center=(x + 0.5*self.switch_size[0], y-10))
+        
+        # Background
+        back_surf = pygame.Surface(self.switch_size)
+        back_rect = (x,y)
+        
+        # Switch
+        sw_surf = pygame.Surface((self.switch_size[0] - 4, self.switch_size[1]/2 - 4))
+        
+        if on:
+            # Switch in on position
+            back_surf.fill(self.GREEN)
+            sw_rect = (x+2,y+2)
+            sw_surf.fill(self.WHITE)
+            txt_surf = self.font.render("ON", True, self.WHITE)
+            txt_rect = txt_surf.get_rect(center=(x + 0.5*self.switch_size[0], y + 0.75*self.switch_size[1]))
+        else:
+            # Switch in off position
+            back_surf.fill(self.RED)
+            sw_rect = (x+2,y + 0.5*self.switch_size[1] + 2)
+            sw_surf.fill(self.WHITE)
+            txt_surf = self.font.render("OFF", True, self.WHITE)
+            txt_rect = txt_surf.get_rect(center=(x + 0.5*self.switch_size[0], y + 0.25*self.switch_size[1]))
+        
+        self.screen.blit(title_surf, title_rect)
+        self.screen.blit(back_surf, back_rect)
+        self.screen.blit(sw_surf, sw_rect)
+        self.screen.blit(txt_surf, txt_rect)
         
     def __draw_drive_sel(self):
         txt_x = self.mode_x + self.mode_but_size[0]/2
@@ -343,9 +466,12 @@ class UI:
             theta_color = self.TXT_COLOR_INACTIVE
         
         # Draw title
-        title_surf = self.font.render("Waypoint to Send", True, self.BLUE)
-        title_rect = title_surf.get_rect(center=((self.wp_y_x + self.wp_z_x + self.wp_tb_size[0])/2,self.wp_x_y-40))
+        title_surf = self.font.render("Waypoint to Send", True, self.BLUE_MED)
+        title_rect = title_surf.get_rect(center=((self.wp_y_x + self.wp_z_x + self.wp_tb_size[0])/2,self.wp_x_y-30))
         self.screen.blit(title_surf, title_rect)
+        
+        # Label y position
+        label_y = self.wp_x_y - 10
         
         # Draw x textbox
         x_surf = pygame.Surface(self.wp_tb_size)
@@ -353,7 +479,7 @@ class UI:
         x_txt_surf = self.font.render(self.wp_x_txt, True, self.BLACK)
         x_rect = pygame.Rect((self.wp_x_x,self.wp_x_y), self.wp_tb_size)
         x_label_surf = self.font.render("x", True, self.BLACK)
-        x_label_rect = x_label_surf.get_rect(center=(self.wp_x_x + self.wp_tb_size[0]/2, self.wp_x_y - 20))
+        x_label_rect = x_label_surf.get_rect(center=(self.wp_x_x + self.wp_tb_size[0]/2, label_y))
         self.screen.blit(x_surf,x_rect)
         self.screen.blit(x_txt_surf,x_rect)
         self.screen.blit(x_label_surf,x_label_rect)
@@ -364,7 +490,7 @@ class UI:
         y_txt_surf = self.font.render(self.wp_y_txt, True, self.BLACK)
         y_rect = pygame.Rect((self.wp_y_x,self.wp_y_y), self.wp_tb_size)
         y_label_surf = self.font.render("y", True, self.BLACK)
-        y_label_rect = y_label_surf.get_rect(center=(self.wp_y_x + self.wp_tb_size[0]/2, self.wp_y_y - 20))
+        y_label_rect = y_label_surf.get_rect(center=(self.wp_y_x + self.wp_tb_size[0]/2, label_y))
         self.screen.blit(y_surf,y_rect)
         self.screen.blit(y_txt_surf,y_rect)
         self.screen.blit(y_label_surf,y_label_rect)
@@ -375,7 +501,7 @@ class UI:
         z_txt_surf = self.font.render(self.wp_z_txt, True, self.BLACK)
         z_rect = pygame.Rect((self.wp_z_x,self.wp_z_y), self.wp_tb_size)
         z_label_surf = self.font.render("z", True, self.BLACK)
-        z_label_rect = z_label_surf.get_rect(center=(self.wp_z_x + self.wp_tb_size[0]/2, self.wp_z_y - 20))
+        z_label_rect = z_label_surf.get_rect(center=(self.wp_z_x + self.wp_tb_size[0]/2, label_y))
         self.screen.blit(z_surf,z_rect)
         self.screen.blit(z_txt_surf,z_rect)
         self.screen.blit(z_label_surf,z_label_rect)
@@ -386,7 +512,7 @@ class UI:
         theta_txt_surf = self.font.render(self.wp_theta_txt, True, self.BLACK)
         theta_rect = pygame.Rect((self.wp_theta_x,self.wp_theta_y), self.wp_tb_size)
         theta_label_surf = self.font.render(u"\u03B8", True, self.BLACK)
-        theta_label_rect = theta_label_surf.get_rect(center=(self.wp_theta_x + self.wp_tb_size[0]/2, self.wp_theta_y - 20))
+        theta_label_rect = theta_label_surf.get_rect(center=(self.wp_theta_x + self.wp_tb_size[0]/2, label_y))
         self.screen.blit(theta_surf,theta_rect)
         self.screen.blit(theta_txt_surf,theta_rect)
         self.screen.blit(theta_label_surf,theta_label_rect)
@@ -402,7 +528,7 @@ class UI:
     def __draw_curr_wp(self):
         
         # Draw title
-        title_surf = self.font.render("Current Waypoint", True, self.BLUE)
+        title_surf = self.font.render("Current Waypoint", True, self.BLUE_MED)
         title_rect = title_surf.get_rect(center=((self.curr_wp_y_x + self.curr_wp_z_x)/2,self.curr_wp_x_y-40))
         self.screen.blit(title_surf, title_rect)
         
@@ -459,11 +585,16 @@ class UI:
         self.clock.tick(self.frame_rate)
 
     def update_screen(self):
-        self.screen.fill(self.WHITE)
-        self.__draw_loc()
+        self.screen.fill(self.GRAY_BACK)
+        self.__draw_header()
+        #self.__draw_loc()
         self.__draw_quit()
+        self.__draw_switch(self.AT_switch_x,self.AT_switch_y,self.AT_en,"AprilTags")
+        self.__draw_switch(self.proj_switch_x,self.proj_switch_y,self.proj_en,"Projector")
+        self.__draw_switch(self.TOF_switch_x,self.TOF_switch_y,self.TOF_en,"TOF Sensors")
         self.__draw_drive_sel()
-        self.__draw_ATList()
+        self.__draw_AT_table()
+        self.__draw_TOF_table()
         self.__draw_error_running()
         if self.drive == 0:
             # Full auto mode
@@ -481,15 +612,23 @@ class UI:
         pygame.init()
 
         # window title 
-        pygame.display.set_caption("LTA Base Station")# Font and size
+        pygame.display.set_caption("LTA Base Station")
+        
+        # Fonts and size
         self.font = pygame.font.Font(None, 20)
+        self.header_font = pygame.font.Font(None, 40)
 
         # Set the width and height of the screen [width, height]
         self.screen = pygame.display.set_mode(self.size)
         
+        # Enable switch positions
+        self.AT_en = True
+        self.proj_en = True
+        self.TOF_en = True
+        
         # Drive type
         # 0 - auto, 1 - waypoint, 2 - manual
-        self.drive = 0
+        self.drive = 2
         
         # Waypoint text entry
         self.wp_x_active = False
@@ -515,29 +654,25 @@ class UI:
         self.print_err = False
         self.err_txt = ''
         self.err_time = time.time()
-
-def get_pos_thread(ip,port):
-    global coords, alt, orient
-    data = {"coords", "alt", "orient"}
-    for d in data:
-        server = conn(ip,port)
-        if d == "coords":
-            coords = server.get_coord()
-        elif d == "alt":
-            alt = server.get_alt()  
-        elif d == "orient":
-            orient = server.get_orient()
-        server.close()
         
-def get_ats_thread(ip,port):
+def get_AT_thread(ip,port):
+    global AT_ID, coords, alt, orient
     server = conn(ip,port)
-    global ATs
-    ATs = []
-    new_ATs = server.get_ATs().split(',')
-    num_ATs = int(new_ATs[0])
-    for a in range(num_ATs):
-        ATs.append(AT(int(new_ATs[3*a+1]),float(new_ATs[3*a+2]),float(new_ATs[3*a+3])))
-    server.close()
+    AT_info = server.get_AT().split(',')
+    AT_visible = bool(AT_info[0])
+    if AT_visible:
+        AT_ID = int(AT_info[1])
+        coords = [float(AT_info[2]), float(AT_info[3])]
+        alt = float(AT_info[4])
+        orient = -1*float(AT_info[5])
+        
+def get_TOF_thread(ip,port):
+    global TOF_dist, TOF_status
+    server = conn(ip,port)
+    TOF_info = server.get_TOF().split(',')
+    for n in range(3):
+        TOF_dist[n] = float(TOF_info[n])
+        TOF_status[n] = int(TOF_info[n+3])
         
 def man_control_thread(ip,port,dir):
     server = conn(ip,port)
@@ -577,7 +712,6 @@ def wp_control_thread(ip,port,ui):
         if str_is_num(y):
             if str_is_num(z):
                 if str_is_num(theta):
-                    print("Sending wp")
                     server = conn(ip,port)
                     server.send_wp(x, y, z, theta)
                     server.close()
@@ -624,16 +758,6 @@ if __name__ == '__main__':
 
     server_port = 12002
     
-    
-    try:
-        coord_thread = threading.Thread(target=get_pos_thread, args=(server_ip,server_port))
-        coord_thread.start()
-    except:
-        ui = UI()
-        ui.draw_error("Connection error")
-        pygame.quit()
-        raise
-    
     ui = UI()
     
     server_counter = 0
@@ -641,20 +765,24 @@ if __name__ == '__main__':
     try:
         while running:
             
-            # Only query drone for position, current waypoint, and AprilTags every 30 frames
-            if server_counter == 30:
-                server_thread = threading.Thread(target=get_pos_thread, args=(server_ip,server_port))
-                server_thread.start()
-                server_counter = 0
-            elif ui.drive == 0 and server_counter == 20:
+            # Only query drone for current waypoint, AprilTag data, and TOF data every 30 frames
+            if ui.drive == 0 and server_counter == 30:
                 # Waypoint only changes in auto mode
                 wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
                 wp_thread.start()
-            elif server_counter == 10:
-                at_thread = threading.Thread(target=get_ats_thread, args=(server_ip,server_port))
+            elif ui.AT_en and server_counter == 20:
+                # Update AprilTag if enabled
+                at_thread = threading.Thread(target=get_AT_thread, args=(server_ip,server_port))
                 at_thread.start()
+            elif ui.TOF_en and server_counter == 10:
+                # Update TOF distances if enabled
+                tof_thread = threading.Thread(target=get_TOF_thread, args=(server_ip,server_port))
+                tof_thread.start()
                 
-            server_counter += 1
+            if server_counter == 30:
+                server_counter = 1
+            else:
+                server_counter += 1
             
             # Handle PyGame events
             for event in pygame.event.get():
@@ -677,27 +805,51 @@ if __name__ == '__main__':
                         # Quit button clicked
                         running = False
                         terminate_server(server_ip,server_port)
-                    elif x < ui.mode_x + 80 and x > ui.mode_x and y < ui.mode_y + 40 and y > ui.mode_y:
+                    elif x < ui.AT_switch_x + ui.switch_size[0] and x > ui.AT_switch_x and \
+                            y < ui.AT_switch_y + ui.switch_size[1] and y > ui.AT_switch_y:
+                        # AprilTag enable switch clicked
+                        ui.AT_en = not ui.AT_en
+                        if not ui.AT_en:
+                            # Clear AT and localization info if ATs disabled
+                            AT_ID = None
+                            coords = None
+                            alt = None
+                            orient = None
+                    elif x < ui.proj_switch_x + ui.switch_size[0] and x > ui.proj_switch_x and \
+                            y < ui.proj_switch_y + ui.switch_size[1] and y > ui.proj_switch_y:
+                        # Projector enable switch clicked
+                        ui.proj_en = not ui.proj_en
+                    elif x < ui.TOF_switch_x + ui.switch_size[0] and x > ui.TOF_switch_x and \
+                            y < ui.TOF_switch_y + ui.switch_size[1] and y > ui.TOF_switch_y:
+                        # Projector enable switch clicked
+                        ui.TOF_en = not ui.TOF_en
+                    elif x < ui.mode_x + ui.mode_but_size[0] and x > ui.mode_x and \
+                            y < ui.mode_y + ui.mode_but_size[1] and y > ui.mode_y:
                         # Auto button clicked
-                        print("Auto")
                         ui.drive = 0
                         wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
                         wp_thread.start()
                         time.sleep(0.02)
                         drive_thread = threading.Thread(target=send_drive_thread, args=(server_ip,server_port,ui.drive))
-                        drive_thread.start()    
-                    elif x < ui.mode_x + 180 and x > ui.mode_x + 100 and y < ui.mode_y + 40 and y > ui.mode_y:
+                        drive_thread.start()
+                        ui.print_err = True
+                        ui.err_txt = "Warning: Auto mode not yet supported"
+                        ui.err_time = time.time()
+                    elif x < ui.mode_x + ui.mode_but_size[0] + ui.mode_but_space and x > ui.mode_x + ui.mode_but_space and \
+                            y < ui.mode_y + ui.mode_but_size[1] and y > ui.mode_y:
                         # Waypoint button clicked
-                        print("Waypoint")
                         ui.drive = 1
                         wp_thread = threading.Thread(target=get_wp_thread, args=(server_ip,server_port,ui))
                         wp_thread.start()
                         time.sleep(0.02)
                         drive_thread = threading.Thread(target=send_drive_thread, args=(server_ip,server_port,ui.drive))
-                        drive_thread.start()                     
-                    elif x < ui.mode_x + 280 and x > ui.mode_x + 200 and y < ui.mode_y + 40 and y > ui.mode_y:
+                        drive_thread.start()  
+                        ui.print_err = True
+                        ui.err_txt = "Warning: Waypoint mode not yet supported"
+                        ui.err_time = time.time()                   
+                    elif x < ui.mode_x + ui.mode_but_size[0] + 2*ui.mode_but_space and x > ui.mode_x + 2*ui.mode_but_space and \
+                            y < ui.mode_y + ui.mode_but_size[1] and y > ui.mode_y:
                         # Manual button clicked
-                        print("Manual")
                         ui.drive = 2
                         time.sleep(0.02)
                         drive_thread = threading.Thread(target=send_drive_thread, args=(server_ip,server_port,ui.drive))
@@ -706,19 +858,15 @@ if __name__ == '__main__':
                         # Waypoint drive mode
                         if x > ui.wp_x_x and x < ui.wp_x_x + ui.wp_tb_size[0] and y > ui.wp_x_y and y < ui.wp_x_y + ui.wp_tb_size[1]:
                             # Waypoint x input clicked
-                            print("WP x clicked")
                             ui.wp_x_active = True
                         elif x > ui.wp_y_x and x < ui.wp_y_x + ui.wp_tb_size[0] and y > ui.wp_y_y and y < ui.wp_y_y + ui.wp_tb_size[1]:
                             # Waypoint y input clicked
-                            print("WP y clicked")
                             ui.wp_y_active = True
                         elif x > ui.wp_z_x and x < ui.wp_z_x + ui.wp_tb_size[0] and y > ui.wp_z_y and y < ui.wp_z_y + ui.wp_tb_size[1]:
                             # Waypoint z input clicked
-                            print("WP z clicked")
                             ui.wp_z_active = True
                         elif x > ui.wp_theta_x and x < ui.wp_theta_x + ui.wp_tb_size[0] and y > ui.wp_theta_y and y < ui.wp_theta_y + ui.wp_tb_size[1]:
                             # Waypoint theta input clicked
-                            print("WP theta clicked")
                             ui.wp_theta_active = True
                         elif x > ui.wp_send_x and x < ui.wp_send_x + ui.wp_tb_size[0] and y > ui.wp_send_y and y < ui.wp_send_y + ui.wp_tb_size[1]:
                             # Send waypoint clicked
@@ -731,40 +879,30 @@ if __name__ == '__main__':
                         # Manual drive mode
                         if x > ui.pos_x and x < ui.pos_x + 70 and y > ui.pos_y and y < ui.pos_y + 70:
                             # Forward button clicked
-                            print("Forward")
                             move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"forward"))
                             move_thread.start()
                         elif x > ui.pos_x and x < ui.pos_x + 70 and y > ui.pos_y + 80 and y < ui.pos_y + 150:
                             # Back button clicked
-                            print("Backward")
                             move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"backward"))
                             move_thread.start()
                         elif x > ui.pos_x + 80 and x < ui.pos_x + 150 and y > ui.pos_y + 80 and y < ui.pos_y + 150:
                             # Right button clicked
-                            print("Right")
                             move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"right"))
                             move_thread.start()
                         elif x > ui.pos_x - 80 and x < ui.pos_x - 10 and y > ui.pos_y + 80 and y < ui.pos_y + 150:
                             # Left button clicked
-                            print("Left")
                             move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"left"))
                             move_thread.start()
                         elif x > ui.alt_x and x < ui.alt_x + 70 and y > ui.alt_y and y < ui.alt_y + 70:
                             # Up button clicked
-                            print("Up")
                             move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"up"))
                             move_thread.start()
                         elif x > ui.alt_x and x < ui.alt_x + 70 and y > ui.alt_y + 80 and y < ui.alt_y + 150:
                             # Down button clicked
-                            print("Down")
                             move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"down"))
                             move_thread.start()
-                    else:
-                        print(x)
-                        print(y)
                 elif(event.type is MOUSEBUTTONUP) and ui.drive == 2:
                     # Stop motors
-                    print("Motors not running")
                     move_thread = threading.Thread(target=man_control_thread, args=(server_ip,server_port,"stop"))
                     move_thread.start()
                 elif(event.type is KEYDOWN) and ui.drive == 1:
@@ -815,11 +953,8 @@ if __name__ == '__main__':
             
             ui.wait_frame_rate()
     except:
-        print("Error")
-        #terminate_server(server_ip,server_port)
         pygame.quit()
         raise
     
-    #terminate_server(server_ip,server_port)
     pygame.quit()
 
