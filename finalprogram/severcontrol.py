@@ -48,20 +48,24 @@ at_detector = Detector(searchpath=['apriltags/lib', 'apriltags/lib64'],
                            refine_edges=1,
                            decode_sharpening=0.25,
                            debug=0)
-# cam = cv2.VideoCapture(0)
-# cam.set(cv2.CAP_PROP_BUFFERSIZE,1)
+cam = cv2.VideoCapture(0)
+cam.set(cv2.CAP_PROP_BUFFERSIZE,1)
 print("The server is ready to receive")
+num=0
 try:
     while running:
         connectionSocket, addr = serverSocket.accept()
         message = connectionSocket.recv(1024).decode()
         print("received message: "+message)
-        # ret, img = cam.read()
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # tags = at_detector.detect(img)
-        # if tags:
-            # AT_ID=int(str(tags[0]))
-            # print("ID "+ str(tags[0]))
+        ret, img = cam.read()
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if num==5:
+            num=0
+            tags = at_detector.detect(img)
+            if tags:
+                AT_ID=int(str(tags[0]))
+                print("ID "+ str(tags[0]))
+        num=num+1
         # if AT_ang >180 or AT_ang <-180:
             # AT_ang=0
         if message == "quit":

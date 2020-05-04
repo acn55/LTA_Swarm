@@ -13,7 +13,7 @@ Apriltags 3 version: Aleksandar Petrov, Spring 2019
 '''
 from __future__ import division
 from __future__ import print_function
-
+from picamera import PiCamera
 import ctypes
 import os
 import numpy
@@ -456,11 +456,13 @@ if __name__ == '__main__':
 
     # with open(test_images_path + '/test_info.yaml', 'r') as stream:
         # parameters = yaml.load(stream)
-    cam = cv2.VideoCapture(0)
-    cam.set(cv2.CAP_PROP_BUFFERSIZE,3)
+    # cam = cv2.VideoCapture(0)
+    # cam.set(cv2.CAP_PROP_BUFFERSIZE,3)
     x=1 
     buf=-1
     index=0
+    camera = PiCamera()
+    time.sleep(0.1)
     #### TEST WITH THE SAMPLE IMAGE ####
     try:
         
@@ -469,8 +471,11 @@ if __name__ == '__main__':
             print(x)
             x=x+1
             #start_time1=time.time()
-            ret, img = cam.read()
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            #ret, img = cam.read()
+            #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            camera.capture('/home/pi/Desktop/image.jpg')
+            test1 =cv2.imread('/home/pi/Desktop/image.jpg')
+            img=cv2.cvtColor(test1, cv2.COLOR_BGR2GRAY)
             tags = at_detector.detect(img)
             if tags:
                 ans=type(int(str(tags[0])))
